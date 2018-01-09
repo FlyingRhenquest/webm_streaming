@@ -1,0 +1,171 @@
+The purpose of this repository is to show you how to:
+
+ 1. Stream HTML5-Compatible video with ffmpeg's "ffserver"
+    program. ffserver does not appear to be available on windows
+    builds of ffmpeg that I looked at. Building ffmpeg in general and
+    on windows in particular is outside the scope of this project.
+
+ 2. Interact with your HTML5 video stream with Javascript. I don't
+    claim to be a Javascript expert, but I've been looking into this
+    recently and found it to be suitably interesting. All the
+    information that I needed to accomplish is not in a single place,
+    so I thought I should consolidate it.
+
+# Step 1: Build or get a ffmpeg package that includes ffserver.
+
+If you're using Linux or OSX, the version that you can get for your
+distribution or homebrew should work. The homebrew version is usually
+pretty up-to-date with the project.  Versions of ffmpeg that come
+with, say, Ubuntu Linux (Which is what I'm using) can tend to be a bit
+older, although they should still work for the scope of this project.
+It is not uncommon for recent builds of ffmpeg to introduce bugs or
+deprecate code, so it can behave unpredictably from version to
+version.  There is also some discussion about deprecating the ffserver
+program completely, although it still comes with the project as of
+this writing.
+
+If you're on Windows, this project will likely not work for you. As
+far as I know, only one guy is packaging ffmpeg for windows, and no
+one else wants to mess with that build process. He builds the project
+non-gpl only and is missing some of the extra utility programs that
+get built with ffmpeg on the UNIX side, as well as several of the
+codecs and file formats.
+
+Once you've installd ffmpeg, verify that "ffserver -version" prints
+something, and that your ffmpeg build has access to libvpx and
+libvorbis with "ffmpeg -codecs | grep libvpx" and "ffmpeg -codecs |
+grep vorbis". Also verify you have the "webm" container format with
+"ffmpeg -formats | grep webm".
+
+# Step 2: Select a Video to Stream
+
+In this case, I'll use ffmpeg to generate a test video with an audio
+tone using ffmpeg filters. You can use any ffmpeg-compatible video or
+hardware source, so if you have a web camera or a Linux-compatible
+HDMI capture card like the Magewell ProCapture card, you can stream
+from /dev/video* as easily as you can from a file (Using the
+video4linux format.) I've worked with the Magewell cards and can
+verify that you CAN read the same source from multiple processes using
+ffmpeg's video4linux format. So streaming and some other application
+processing them at the same time does work.
+
+# Step 3: Stream It
+
+This step requires you to create a ffserver.conf file to configure
+ffserver and create a ffmpeg command line that will be used to stream
+the video content into the server.  This process uses a special muxer
+for ffserver, which can communicate parameters between ffmpeg and
+ffserver.
+
+You can get a fresh sample ffserver config file at
+https://www.ffmpeg.org/sample.html. I'm including one with this
+project which is configured for our test video. It puts its ffm
+cache file in /tmp.
+
+If you start with a fresh ffserver config, you may want to change the
+HTTPBindAddress parameter to 127.0.0.1 so your video isn't accessible
+to the entire internet. Even if that's what you want, we can expose it
+later as part of some shenanigans that the browser requires when
+interacting with the video with Javascript. More on that shortly.
+
+## Set Up Feed and Streaams in ffsever Config
+
+In order to stream with ffserver, you have to set up a feed. This is a
+temporary file and URL that ffmpeg can stream into and that ffserver
+will stream out to to the network. After the feeds are set up in
+ffserver.conf, you will also set up streams in the same file. One feed
+can be used in multiple streams. Feeds are fed from your ffmpeg
+command line to the ffserver via a http URL that ffserver sets up, so
+the ACL on your feed should only allow addresses that are allowed to
+feed your server's stream (127.0.0.1 in this case.)
+
+Setting up a feed is straightforward; specify the name of the feed in
+the feed tag, the file it will be buffered in, the maximum size of the
+file and an ACL with addresses that are allowed to feed it.
+
+Setting up a stream takes a bit more effort. The parameters must be
+similar to the ffmpeg command you use to encode the video, and if you
+encode to the wrong codec or container format, ffserver or ffmpeg
+or both will just crash on you.
+
+You can create multiple streams from one feed. In this case, I'm
+configuring the feed at the full size and rate of the video and also
+doing a smaller thumbnail feed that doesn't have audio.
+
+## Set up FFMpeg command lines
+
+I do this in a script (startstreams.sh). If you're using a file with
+both audio and video in it, it's a bit easier than if you have to mux
+the audio and video feeds into one stream. Since I'm generating the
+streams separately, I need to mux them together. The magewell cards
+I've worked with provide video using the video4linux format and audio
+via alsa or pulseaudio, so those have to be read and muxed together
+as well.
+
+You can start this script in screen so it doesn't stop streaming when
+you log out or close the window the streaming was started in. You
+could also do this in a detached process as part of an application if
+you were so inclined. If you've never used screen before, see
+https://www.gnu.org/software/screen/.
+
+# Set up Web Server
+
+Next we'll need a web server to serve your javascript and HTML. If
+you have a recent version of python 3 installed, you can use the
+following command in this directory:
+
+python3 -m http.server 8000 --bind 127.0.0.1
+
+This will simply serve all the files in the directory on localhost
+only.
+
+# Set up HTML
+
+Now set up an HTML to serve the video with HTML5. A VPX/Opus video
+I believe will work on all html5-capable browsers, but I suppose
+YMMV.
+
+You'll need a video tag with a source and a canvas. We'll specify
+the source as the thumbnail stream we configured in ffserver.conf.
+
+You should now be able to see the video on your page, so we're almost
+there. For the moment you're going to need a few terminal windows, so
+you can verify this by:
+
+ 1. Starting up ffserver with ffserver -f ffserver.conf
+ 2. Run the startstreaming.sh script to use ffmpeg to stream the video
+    to ffserver.
+ 3. Run "python3 -m http.server 8000 --bind 127.0.0.1" to serve the
+    HTML file.
+ 4. Navagate your browser to http://127.0.0.1:8000/video_demo.html
+
+# Shenanigans
+
+Now you may have some trouble if your video is coming from a different
+address than your HTML is. Your browser will typically prevent you
+from interacting with the image data from a video that's coming from
+elsewhere. If this is a problem for you, you can make all your stuff
+appear to come from the same server with a reverse proxy such as
+tinyproxy. I'm using tinyproxy (https://github.com/tinyproxy/tinyproxy)
+in this example.
+
+Seeing as how your distribution will probably not compile
+in the options you want with tinyproxy, it's best to grab the
+source and build it yourself:
+
+cd ~/sandbox # Where I keep my files from git
+git clone https://github.com/tinyproxy/tinyproxy.git
+cd tinyproxy
+./autogen.sh
+./configure --enable-reverse
+make
+sudo make install # will install in /usr/local/sbin
+
+And ignore junk about the man pages failing to build. Where we're
+going, we don't need no steekin' man pages.
+
+Then run "tinyproxy -d -c tinyproxy.conf" in this directory and
+navigate your browser to http://127.0.0.1:8888/ui/video_demo2.html.
+This will pull the videos in from http://127.0.0.1:8888/videos via
+tinyproxy, so your html, javascript and videos are all coming
+from the same place.
