@@ -1,0 +1,65 @@
+Well that's all well and good, but what if I want to do something with
+that video frame I just captured? Ok! I'll show you how to post it to
+a web service. I'm going to write my web service in C++ for reasons,
+but I'm also going to try to keep it as simple as possible.
+
+Dependencies:
+
+We are going to need a couple of things for our web service in C++.
+First off, we're going to need a base64 encoding library or function.
+There are about 8 million of these available, but I'm going with this
+project as it hits the sweet spot of header-only and easy to use:
+
+https://github.com/tplgy/cppcodec
+
+Make a working directory, cd there, and check out my video streaming
+project and cppcodec. I'll just set up my build for an include path
+that looks for the cppcodec includes in ../cppcodec.
+
+I'm also going to need a quick and dirty library I can build my service
+with. I like served for this:
+
+https://github.com/datasift/served
+
+Unfortunately it comes with dependencies on boost, which hopefully you
+already have installed, and the RE2 library. On ubuntu, you can apt-get
+install libre2-dev. Other OSes and linux dists YMMV.
+
+Check out served in the same directory with cppcodec and webm_streaming
+and build it like so:
+
+mkdir bin
+cd bin
+cmake .. -DSERVED_BUILD_SHARED=OFF -DSERVED_BUILD_STATIC=ON -DSERVED_BUILD_EXAMPLES=OFF
+make
+
+Do that and I'll set up my build to look for the library in
+../served/lib/libserved.a
+
+I'm setting my images service to run on http:/127.0.0.1:8080/images.
+When you build the C++ library, the makefile will make an images
+directory in the webm_streaming directory. I'm also modifying the
+tinyproxy.conf file to put /images on the sasme port with /ui and
+/video. This way it looks to your user like you have one service
+running on port 8888. This makes interacting with everything with
+Javascript a lot more simple, as you don't run afould of the cross
+site scripting protections.
+
+Using:
+
+To see this in action, run "make" in this diretory and then run
+./start_services.sh. That'll fire up all the services we use. Then
+navigate to http://127.0.0.1:8888/ui/video_dem3.html. Push the
+button to copy the video feed to the HTML canvas, then fill in
+a filename(.jpg) and press "post". It won't seem to do anything,
+but should show up in http://127.0.0.1:8888/images and
+http://127.0.0.1:8888/image/filename.jpg. You can also look at
+the image in your local directory.
+
+If you want to store the image serialized, you can skip the
+base64::decode in the post method on the server side and write
+it into a JSON object or something. You can transfer it back
+to javascript, put header I stripped off in the javascript
+code back on it and write it back to a canvas. It might be
+easier to, say, store in a database, if you keep it in
+base64 format.

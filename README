@@ -169,3 +169,14 @@ navigate your browser to http://127.0.0.1:8888/ui/video_demo2.html.
 This will pull the videos in from http://127.0.0.1:8888/videos via
 tinyproxy, so your html, javascript and videos are all coming
 from the same place.
+
+Update:
+
+I added some functionality in video_demo3.html to copy the image
+on the canvas to a remote REST server. See roundtrip.txt for
+instructions on setting that up. I hacked out a little C++
+REST server to receive the image (encoded in Base64) and
+decode it to an images directory that gets created in this
+directory when you run the makefile. Once you've sent the image,
+you can retrieve it directly with the REST service or just
+look at it in your images directory.

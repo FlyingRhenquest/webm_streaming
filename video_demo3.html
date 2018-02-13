@@ -1,0 +1,49 @@
+<html>
+  <head>
+    <title>Video Demo</title>
+  </head>
+  <body>
+    <a href="http://127.0.0.1:8888/videos/stat.html">Server Status</a>
+    <p/>
+    <video id="demo_video" autoplay controls>
+      <source src="http://127.0.0.1:8888/videos/test_pattern.webm">
+    </video>
+    <p>
+      <button id="copy_button">Copy to Canvas</button>
+    <p>
+      Fill in filename on server and hit post:<br>
+      <input type="text" id="filename" size="30"><br>
+      <button id="post_button">Post</button>
+    <p>
+      <canvas id="demo_canvas"></canvas>
+    <script>
+    
+    document.addEventListener("DOMContentLoaded", function() {  
+    var copy_button = document.getElementById("copy_button");
+    var post_button = document.getElementById("post_button");
+    copy_button.addEventListener("click", function() {
+	var video = document.getElementById("demo_video");
+	var canvas = document.getElementById("demo_canvas");
+	var ctx = canvas.getContext("2d");
+	canvas.width = video.videoWidth;
+	canvas.height = video.videoHeight
+	ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    });
+    post_button.addEventListener("click", function() {
+        var filename = document.getElementById("filename").value;
+        var url = "/image/" + filename;
+        var canvas = document.getElementById("demo_canvas");
+        var encoded_image = canvas.toDataURL("image/jpeg").replace("data:image/jpeg;base64,", "");
+        // Should really check return value in .then
+        fetch(url, {
+           method: 'POST',
+           body: encoded_image
+        });
+    });
+});
+
+     </script>
+				    
+	     
+  </body>
+</html>
